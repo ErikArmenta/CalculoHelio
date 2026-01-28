@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jan 13 07:24:32 2026
+
+@author: acer
+"""
+
 import streamlit as st
 import pandas as pd
 import altair as alt
@@ -116,7 +123,7 @@ if not df_vista.empty:
     c2.metric("Presión Absoluta", f"{last['Vessel Pressure']:.1f} PSIA")
     c3.metric("Factor Fv", f"{last['Volume Factor (Fv)']:.4f}")
 
-    alert_val = last['Consumo Absoluto M3'] > 2
+    alert_val = last['Consumo Absoluto M3'] > 5
     c4.metric("Consumo Neto", f"{last['Consumo Absoluto M3']:.2f} M3",
               "⚠️ ALTA" if alert_val else "OK", delta_color="inverse" if alert_val else "normal")
 
@@ -168,7 +175,7 @@ with col_btn:
 st.subheader("Análisis de Tendencia")
 
 plot_data = edited_df.copy()
-plot_data['Alerta'] = plot_data['Consumo Absoluto M3'] > 2
+plot_data['Alerta'] = plot_data['Consumo Absoluto M3'] > 5
 
 chart = alt.Chart(plot_data).mark_line(point=True).encode(
     x=alt.X('Marca temporal:T', title='Tiempo'),
@@ -190,7 +197,36 @@ chart = alt.Chart(plot_data).mark_line(point=True).encode(
 st.altair_chart(chart, use_container_width=True)
 
 if plot_data['Alerta'].any():
-    st.error("🚨 Alerta: Se detectaron fluctuaciones de consumo superiores a 2 m³ en el rango seleccionado.")
+    st.error("🚨 Alerta: Se detectaron fluctuaciones de consumo superiores a 5 m³ en el rango seleccionado.")
+
+
+
+# --- 9. NUEVA GRÁFICA MULTI-VARIABLE ---
+st.subheader("Correlación de Variables (PSI, Volumen, Temp °F)")
+
+# Derretimos el dataframe para que Altair pueda manejar múltiples colores por variable
+df_melted = plot_data.melt(
+    id_vars=['Marca temporal'],
+    value_vars=['Presión', 'Volume in Cubic Meters ( M3 )', 'Temperatura Fahrenheit'],
+    var_name='Variable',
+    value_name='Valor'
+)
+
+# Diccionario de colores solicitado
+color_scale = alt.Scale(
+    domain=['Presión', 'Volume in Cubic Meters ( M3 )', 'Temperatura Fahrenheit'],
+    range=['#FF0000', '#0000FF', '#FFD700'] # Rojo, Azul, Dorado/Amarillo
+)
+
+multi_chart = alt.Chart(df_melted).mark_line(point=True).encode(
+    x=alt.X('Marca temporal:T', title='Tiempo'),
+    y=alt.Y('Valor:Q', title='Escala Unificada', scale=alt.Scale(zero=False)),
+    color=alt.Color('Variable:N', scale=color_scale, title="Leyenda"),
+    tooltip=['Marca temporal:T', 'Variable:N', 'Valor:Q']
+).interactive().properties(height=450)
+
+st.altair_chart(multi_chart, use_container_width=True)
+
 
 # --- 9. FIRMA ---
 st.markdown(
@@ -206,3 +242,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
