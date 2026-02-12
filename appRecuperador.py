@@ -255,40 +255,78 @@ st.markdown(
 )
 
 
-# --- 10. ASISTENTE DE IA (EA INNOVATION ASSISTANT) ---
+# --- 10. EA INNOVATION AI AGENT (FULL THERMODYNAMIC POWER) ---
 import google.generativeai as genai
-import ssl
-import os
+import altair as alt
+import pandas as pd
 
-# 1. Mantenemos el bypass de SSL por si acaso
+# 1. HERRAMIENTA TÉCNICA: Lógica de Erik Armenta
+def calculadora_expert_ea(temp_c: float, presion_psi: float):
+    """
+    Calcula los factores termodinámicos exactos (Z, Fv, M3) para un punto dado.
+    Útil para simulaciones o explicar cambios en el sistema.
+    """
+    # Constantes y Fórmulas de Erik Armenta
+    BASE_VOLUME = 450.00
+    temp_f = temp_c * 1.8 + 32
+    vessel_pres = presion_psi + 14.7
+    t_term = 459.7 + temp_f
+    
+    # Cálculo de Factor Z
+    part1 = 0.000102297 - (0.000000192998 * t_term) + (0.00000000011836 * (t_term**2))
+    z_factor = 1 + (part1 * vessel_pres) - (0.0000000002217 * (vessel_pres**2))
+    
+    # Factor de Volumen (Fv)
+    f_temp = 529.7 / (temp_f + 459.7)
+    f_pres = vessel_pres / 14.7
+    f_comp = 1.00049 / z_factor
+    f_exp_metal = 1 + (0.0000189 * (temp_f - 70))
+    f_pres_efect = 1 + (0.00000074 * vessel_pres)
+    fv = f_temp * f_pres * f_comp * f_exp_metal * f_pres_efect
+    
+    vol_m3 = (BASE_VOLUME * fv) / 35.315
+    
+    return {
+        "Factor_Z": round(z_factor, 6),
+        "Factor_Fv": round(fv, 4),
+        "Volumen_M3": round(vol_m3, 4)
+    }
+
+def crear_grafica_agente(variable: str):
+    """Genera una gráfica de tendencia para el análisis visual."""
+    if variable in df_vista.columns:
+        chart = alt.Chart(df_vista).mark_line(point=True, color='#5271ff').encode(
+            x=alt.X('Marca temporal:T', title='Tiempo'),
+            y=alt.Y(f'{variable}:Q', title=variable, scale=alt.Scale(zero=False)),
+            tooltip=['Marca temporal', variable]
+        ).interactive().properties(height=300)
+        st.altair_chart(chart, use_container_width=True)
+        return f"Gráfica de {variable} desplegada."
+    return "Variable no encontrada."
+
+# 2. CONFIGURACIÓN DEL AGENTE
 try:
-    _create_unverified_https_context = ssl._create_unverified_context
-except AttributeError:
-    pass
-else:
-    ssl._create_default_https_context = _create_unverified_https_context
+    api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
+    genai.configure(api_key=api_key)
+    
+    model = genai.GenerativeModel(
+        model_name='gemini-1.5-flash',
+        tools=[calculadora_expert_ea, crear_grafica_agente],
+        system_instruction="""
+        Eres el Agente Senior de EA Innovation. 'Accuracy is our signature'.
+        Tienes acceso total a las fórmulas de calculate_thermodynamics.
+        Si el usuario te da valores de Temp y Presión, usa 'calculadora_expert_ea' para dar el dato exacto.
+        Si hay dudas de tendencias, usa 'crear_grafica_agente'.
+        Si la presión baja de 1000 PSI, advierte sobre posible despresurización o mantenimiento preventivo.
+        """
+    )
+except Exception as e:
+    st.error(f"Error: {e}")
 
-# 2. Configuración de API
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-except:
-    api_key = ""
-
-genai.configure(api_key=api_key)
-
+# 3. CHAT INTERFACE
 st.divider()
-st.header("🤖 EA Innovation Assistant")
+st.header("🤖 EA Innovation Agent")
 st.caption("Consulta datos técnicos, cálculos termodinámicos y análisis de tendencias en tiempo real.")
-
-SYSTEM_PROMPT = """
-Eres el Asistente de Ingeniería de EA Innovation. Tu firma es 'Accuracy is our signature'.
-Tu objetivo es ayudar a los usuarios a interpretar los datos del Sistema de Recuperación de Helio.
-Instrucciones:
-1. Sé técnico, preciso y profesional.
-2. Tienes acceso a los últimos datos registrados en la tabla.
-3. Si el usuario pregunta por cálculos, usa siempre las fórmulas termodinámicas basadas en el Factor Z que Erik Armenta implementó.
-4. Si detectas anomalías (presión alta o temperaturas fuera de rango), menciónalo preventivamente.
-"""
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -297,35 +335,19 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if chat_input := st.chat_input("¿Ingeniero, en qué puedo ayudarte hoy?"):
-    st.session_state.messages.append({"role": "user", "content": chat_input})
+if prompt := st.chat_input("¿Qué análisis termodinámico necesitas?"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
-        st.markdown(chat_input)
+        st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        try:
-            # Buscamos el nombre exacto del modelo disponible en tu cuenta
-            modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        chat = model.start_chat(enable_automatic_function_calling=True)
+        # Enviamos los últimos datos como referencia
+        contexto = f"DATOS DE PLANTA:\n{df_vista.tail(5).to_string()}\n\nPREGUNTA: {prompt}"
+        response = chat.send_message(contexto)
+        st.markdown(response.text)
+        st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-            # Intentamos usar flash si está, si no, el primero que soporte contenido
-            modelo_nombre = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in modelos_disponibles else modelos_disponibles[0]
-
-            model = genai.GenerativeModel(
-                model_name=modelo_nombre,
-                system_instruction=SYSTEM_PROMPT
-            )
-
-            contexto_datos = df_vista.tail(10).to_string(index=False)
-            prompt_completo = f"DATOS ACTUALES:\n{contexto_datos}\n\nPREGUNTA: {chat_input}"
-
-            response = model.generate_content(prompt_completo)
-
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-
-        except Exception as e:
-            st.error(f"Error técnico: {e}")
-            st.info("Si el error persiste, intenta cambiar el nombre del modelo a 'gemini-1.5-pro'.")
 
 
 
