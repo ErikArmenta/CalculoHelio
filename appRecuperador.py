@@ -297,7 +297,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if chat_input := st.chat_input("¿Erik, en qué puedo ayudarte hoy?"):
+if chat_input := st.chat_input("¿Ingeniero, en qué puedo ayudarte hoy?"):
     st.session_state.messages.append({"role": "user", "content": chat_input})
     with st.chat_message("user"):
         st.markdown(chat_input)
@@ -326,5 +326,6 @@ if chat_input := st.chat_input("¿Erik, en qué puedo ayudarte hoy?"):
         except Exception as e:
             st.error(f"Error técnico: {e}")
             st.info("Si el error persiste, intenta cambiar el nombre del modelo a 'gemini-1.5-pro'.")
+
 
 
