@@ -262,7 +262,7 @@ import pandas as pd
 import ssl
 import os
 
-# A. BYPASS DE SEGURIDAD (Para evitar bloqueos de certificados en redes locales)
+# A. BYPASS DE SEGURIDAD
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
@@ -271,21 +271,55 @@ else:
     ssl._create_default_https_context = _create_unverified_https_context
 
 # B. CONFIGURACIÓN DE HERRAMIENTAS TÉCNICAS
+def analizar_tendencias_historicas(metrica: str):
+    """
+    Calcula estadísticas de todo el historial para una métrica específica.
+    Métricas: 'Presión', 'Temperatura Celsius', 'Volume in Cubic Meters ( M3 )'.
+    """
+    if metrica in df_full.columns:
+        resumen = {
+            "Metrica": metrica,
+            "Promedio_Historico": round(df_full[metrica].mean(), 2),
+            "Maximo": round(df_full[metrica].max(), 2),
+            "Minimo": round(df_full[metrica].min(), 2),
+            "Total_Registros": len(df_full)
+        }
+        return resumen
+    return "Métrica no encontrada."
+
+# 2. ACTUALIZACIÓN DEL MODELO (Añadir la herramienta)
+try:
+    api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
+    genai.configure(api_key=api_key)
+    
+    modelos_visibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    modelo_final = next((m for m in modelos_visibles if 'gemini-1.5-flash' in m), modelos_visibles[0])
+    
+    # Añadimos 'analizar_tendencias_historicas' a la lista de tools
+    model = genai.GenerativeModel(
+        model_name=modelo_final,
+        tools=[calculadora_expert_ea, crear_grafica_agente, analizar_tendencias_historicas],
+        system_instruction="""
+        Eres el Agente Senior de EA Innovation. 
+        Ahora tienes el 'Poder de Memoria Total'. 
+        Si el usuario pregunta por el historial completo o promedios de largo plazo, 
+        usa 'analizar_tendencias_historicas'. 
+        No te limites a los últimos datos si la pregunta requiere ver el pasado.
+        """
+    )
+except Exception as e:
+    st.error(f"Error: {e}")
+
 def calculadora_expert_ea(temp_c: float, presion_psi: float):
-    """
-    Calcula los factores termodinámicos exactos (Z, Fv, M3) usando la lógica de Erik Armenta.
-    Ideal para comparaciones contra condiciones estándar o simulaciones.
-    """
+    """Calcula los factores termodinámicos exactos (Z, Fv, M3) usando la lógica de Erik Armenta."""
     BASE_VOLUME = 450.00
     temp_f = temp_c * 1.8 + 32
     vessel_pres = presion_psi + 14.7
     t_term = 459.7 + temp_f
     
-    # Cálculo de Factor Z
     part1 = 0.000102297 - (0.000000192998 * t_term) + (0.00000000011836 * (t_term**2))
     z_factor = 1 + (part1 * vessel_pres) - (0.0000000002217 * (vessel_pres**2))
     
-    # Factor de Volumen (Fv)
     f_temp = 529.7 / (temp_f + 459.7)
     f_pres = vessel_pres / 14.7
     f_comp = 1.00049 / z_factor
@@ -294,12 +328,7 @@ def calculadora_expert_ea(temp_c: float, presion_psi: float):
     fv = f_temp * f_pres * f_comp * f_exp_metal * f_pres_efect
     
     vol_m3 = (BASE_VOLUME * fv) / 35.315
-    
-    return {
-        "Factor_Z": round(z_factor, 6),
-        "Factor_Fv": round(fv, 4),
-        "Volumen_M3": round(vol_m3, 4)
-    }
+    return {"Factor_Z": round(z_factor, 6), "Factor_Fv": round(fv, 4), "Volumen_M3": round(vol_m3, 4)}
 
 def crear_grafica_agente(variable: str):
     """Genera una gráfica de tendencia instantánea para análisis visual de datos."""
@@ -311,28 +340,33 @@ def crear_grafica_agente(variable: str):
         ).interactive().properties(height=300)
         st.altair_chart(chart, use_container_width=True)
         return f"Gráfica de {variable} generada correctamente."
-    return f"La variable {variable} no existe en el log actual."
+    return f"La variable {variable} no existe."
 
-# C. CONFIGURACIÓN DEL CEREBRO (GEMINI)
+# C. CONFIGURACIÓN DEL CEREBRO (DETECCIÓN DINÁMICA DE MODELO)
 try:
-    # Prioridad a Secrets de Streamlit
     api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
     genai.configure(api_key=api_key)
     
+    # 1. Listamos modelos para evitar el error 404
+    modelos_visibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    
+    # 2. Buscamos el mejor disponible (flash) o el primero de la lista
+    modelo_final = next((m for m in modelos_visibles if 'gemini-1.5-flash' in m), modelos_visibles[0])
+    
     INSTRUCCIONES_AGENTE = """
     Eres el Agente Senior de EA Innovation. Tu firma es 'Accuracy is our signature'.
-    Tu misión es asistir a ingenieros y operadores en el Sistema de Recuperación de Helio.
-    - Tienes acceso a 'calculadora_expert_ea' para cálculos precisos de Z y Fv.
-    - Tienes acceso a 'crear_grafica_agente' para mostrar tendencias visuales.
-    - Si la presión baja de 1000 PSI, advierte sobre mantenimiento preventivo.
-    - Siempre basa tus respuestas en los datos reales del log proporcionados.
+    - Usa 'calculadora_expert_ea' para cálculos precisos.
+    - Usa 'crear_grafica_agente' para tendencias.
+    - Si la presión baja de 1000 PSI, advierte mantenimiento.
     """
     
     model = genai.GenerativeModel(
-        model_name='gemini-1.5-flash',
+        model_name=modelo_final,
         tools=[calculadora_expert_ea, crear_grafica_agente],
         system_instruction=INSTRUCCIONES_AGENTE
     )
+    st.sidebar.success(f"IA Conectada: {modelo_final.split('/')[-1]}")
+
 except Exception as e:
     st.error(f"Error en configuración IA: {e}")
 
@@ -344,12 +378,10 @@ st.caption("Inteligencia Termodinámica Aplicada | Accuracy is our signature.")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Dibujar historial
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Procesar entrada
 if prompt := st.chat_input("¿Ingeniero, qué análisis termodinámico necesita?"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -357,19 +389,14 @@ if prompt := st.chat_input("¿Ingeniero, qué análisis termodinámico necesita?
 
     with st.chat_message("assistant"):
         try:
-            # Iniciamos chat con ejecución automática de funciones
             chat = model.start_chat(enable_automatic_function_calling=True)
-            
-            # Resumen de datos actuales para contexto
-            contexto = f"DATOS EN VIVO (Log): \n{df_vista.tail(10).to_string(index=False)}\n\nPREGUNTA: {prompt}"
-            
+            contexto = f"DATOS EN VIVO: \n{df_vista.tail(10).to_string(index=False)}\n\nPREGUNTA: {prompt}"
             response = chat.send_message(contexto)
-            
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
-            
         except Exception as e:
             st.error(f"El Agente encontró un obstáculo técnico: {e}")
+
 
 
 
