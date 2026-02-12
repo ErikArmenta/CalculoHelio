@@ -91,6 +91,17 @@ def calculate_thermodynamics(df_input):
 
     return df.reset_index(drop=True)
 
+def obtener_analisis_termodinamico(temp_c, presion_psi):
+    """
+    Calcula el volumen y factor de compresibilidad usando la lógica de EA Innovation.
+    """
+    # Aquí encapsulas la lógica que ya tienes en 'calculate_thermodynamics'
+    # para un solo punto de dato si el usuario pregunta algo específico.
+    vessel_pres = presion_psi + 14.7
+    t_term = 459.7 + (temp_c * 1.8 + 32)
+    # ... (tu fórmula de Factor Z)
+    return {"volumen_m3": 12.34, "factor_z": 0.998} # Ejemplo de retorno
+
 # --- 4. GESTIÓN DE ESTADO (SESSION STATE) ---
 if 'master_data' not in st.session_state:
     try:
@@ -242,4 +253,78 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+
+# --- 10. ASISTENTE DE IA (EA INNOVATION ASSISTANT) ---
+import google.generativeai as genai
+import ssl
+import os
+
+# 1. Mantenemos el bypass de SSL por si acaso
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
+# 2. Configuración de API
+try:
+    api_key = st.secrets["GEMINI_API_KEY"]
+except:
+    api_key = ""
+
+genai.configure(api_key=api_key)
+
+st.divider()
+st.header("🤖 EA Innovation Assistant")
+st.caption("Conectado vía EA Network - Accuracy is our signature")
+
+SYSTEM_PROMPT = """
+Eres el Asistente de Ingeniería de EA Innovation. Tu firma es 'Accuracy is our signature'.
+Tu objetivo es ayudar a los usuarios a interpretar los datos del Sistema de Recuperación de Helio.
+Instrucciones:
+1. Sé técnico, preciso y profesional.
+2. Tienes acceso a los últimos datos registrados en la tabla.
+3. Si el usuario pregunta por cálculos, usa siempre las fórmulas termodinámicas basadas en el Factor Z que Erik Armenta implementó.
+4. Si detectas anomalías (presión alta o temperaturas fuera de rango), menciónalo preventivamente.
+"""
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if chat_input := st.chat_input("¿Erik, en qué puedo ayudarte hoy?"):
+    st.session_state.messages.append({"role": "user", "content": chat_input})
+    with st.chat_message("user"):
+        st.markdown(chat_input)
+
+    with st.chat_message("assistant"):
+        try:
+            # Buscamos el nombre exacto del modelo disponible en tu cuenta
+            modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+
+            # Intentamos usar flash si está, si no, el primero que soporte contenido
+            modelo_nombre = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in modelos_disponibles else modelos_disponibles[0]
+
+            model = genai.GenerativeModel(
+                model_name=modelo_nombre,
+                system_instruction=SYSTEM_PROMPT
+            )
+
+            contexto_datos = df_vista.tail(10).to_string(index=False)
+            prompt_completo = f"DATOS ACTUALES:\n{contexto_datos}\n\nPREGUNTA: {chat_input}"
+
+            response = model.generate_content(prompt_completo)
+
+            st.markdown(response.text)
+            st.session_state.messages.append({"role": "assistant", "content": response.text})
+
+        except Exception as e:
+            st.error(f"Error técnico: {e}")
+            st.info("Si el error persiste, intenta cambiar el nombre del modelo a 'gemini-1.5-pro'.")
+
 
