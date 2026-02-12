@@ -278,7 +278,7 @@ genai.configure(api_key=api_key)
 
 st.divider()
 st.header("🤖 EA Innovation Assistant")
-st.caption("Conectado vía EA Network - Accuracy is our signature")
+st.caption("Consulta datos técnicos, cálculos termodinámicos y análisis de tendencias en tiempo real.")
 
 SYSTEM_PROMPT = """
 Eres el Asistente de Ingeniería de EA Innovation. Tu firma es 'Accuracy is our signature'.
@@ -326,6 +326,7 @@ if chat_input := st.chat_input("¿Ingeniero, en qué puedo ayudarte hoy?"):
         except Exception as e:
             st.error(f"Error técnico: {e}")
             st.info("Si el error persiste, intenta cambiar el nombre del modelo a 'gemini-1.5-pro'.")
+
 
 
 
