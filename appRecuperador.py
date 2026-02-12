@@ -255,7 +255,7 @@ st.markdown(
 )
 
 
-# --- 10. EA INNOVATION AI AGENT (FULL THERMODYNAMIC POWER) ---
+# --- 10. EA INNOVATION AI AGENT (FULL POWER & HISTORY) ---
 import google.generativeai as genai
 import altair as alt
 import pandas as pd
@@ -270,12 +270,10 @@ except AttributeError:
 else:
     ssl._create_default_https_context = _create_unverified_https_context
 
-# B. CONFIGURACIÓN DE HERRAMIENTAS TÉCNICAS
+# B. DEFINICIÓN DE HERRAMIENTAS (Deben ir primero)
+
 def analizar_tendencias_historicas(metrica: str):
-    """
-    Calcula estadísticas de todo el historial para una métrica específica.
-    Métricas: 'Presión', 'Temperatura Celsius', 'Volume in Cubic Meters ( M3 )'.
-    """
+    """Calcula estadísticas de TODO el historial para una métrica específica."""
     if metrica in df_full.columns:
         resumen = {
             "Metrica": metrica,
@@ -286,29 +284,6 @@ def analizar_tendencias_historicas(metrica: str):
         }
         return resumen
     return "Métrica no encontrada."
-
-# 2. ACTUALIZACIÓN DEL MODELO (Añadir la herramienta)
-try:
-    api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
-    genai.configure(api_key=api_key)
-    
-    modelos_visibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    modelo_final = next((m for m in modelos_visibles if 'gemini-1.5-flash' in m), modelos_visibles[0])
-    
-    # Añadimos 'analizar_tendencias_historicas' a la lista de tools
-    model = genai.GenerativeModel(
-        model_name=modelo_final,
-        tools=[calculadora_expert_ea, crear_grafica_agente, analizar_tendencias_historicas],
-        system_instruction="""
-        Eres el Agente Senior de EA Innovation. 
-        Ahora tienes el 'Poder de Memoria Total'. 
-        Si el usuario pregunta por el historial completo o promedios de largo plazo, 
-        usa 'analizar_tendencias_historicas'. 
-        No te limites a los últimos datos si la pregunta requiere ver el pasado.
-        """
-    )
-except Exception as e:
-    st.error(f"Error: {e}")
 
 def calculadora_expert_ea(temp_c: float, presion_psi: float):
     """Calcula los factores termodinámicos exactos (Z, Fv, M3) usando la lógica de Erik Armenta."""
@@ -342,27 +317,26 @@ def crear_grafica_agente(variable: str):
         return f"Gráfica de {variable} generada correctamente."
     return f"La variable {variable} no existe."
 
-# C. CONFIGURACIÓN DEL CEREBRO (DETECCIÓN DINÁMICA DE MODELO)
+# C. CONFIGURACIÓN DEL CEREBRO (Ahora que las funciones existen, las vinculamos)
 try:
     api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
     genai.configure(api_key=api_key)
     
-    # 1. Listamos modelos para evitar el error 404
     modelos_visibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    
-    # 2. Buscamos el mejor disponible (flash) o el primero de la lista
     modelo_final = next((m for m in modelos_visibles if 'gemini-1.5-flash' in m), modelos_visibles[0])
     
     INSTRUCCIONES_AGENTE = """
     Eres el Agente Senior de EA Innovation. Tu firma es 'Accuracy is our signature'.
-    - Usa 'calculadora_expert_ea' para cálculos precisos.
-    - Usa 'crear_grafica_agente' para tendencias.
+    - Usa 'calculadora_expert_ea' para cálculos puntuales.
+    - Usa 'crear_grafica_agente' para ver tendencias recientes.
+    - Usa 'analizar_tendencias_historicas' si el usuario pregunta por promedios, máximos o mínimos de TODO el historial.
     - Si la presión baja de 1000 PSI, advierte mantenimiento.
     """
     
+    # Vinculamos las 3 herramientas
     model = genai.GenerativeModel(
         model_name=modelo_final,
-        tools=[calculadora_expert_ea, crear_grafica_agente],
+        tools=[calculadora_expert_ea, crear_grafica_agente, analizar_tendencias_historicas],
         system_instruction=INSTRUCCIONES_AGENTE
     )
     st.sidebar.success(f"IA Conectada: {modelo_final.split('/')[-1]}")
@@ -390,12 +364,14 @@ if prompt := st.chat_input("¿Ingeniero, qué análisis termodinámico necesita?
     with st.chat_message("assistant"):
         try:
             chat = model.start_chat(enable_automatic_function_calling=True)
-            contexto = f"DATOS EN VIVO: \n{df_vista.tail(10).to_string(index=False)}\n\nPREGUNTA: {prompt}"
+            # Pasamos los últimos 10 datos como contexto rápido
+            contexto = f"DATOS RECIENTES: \n{df_vista.tail(10).to_string(index=False)}\n\nPREGUNTA: {prompt}"
             response = chat.send_message(contexto)
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
             st.error(f"El Agente encontró un obstáculo técnico: {e}")
+
 
 
 
