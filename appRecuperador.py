@@ -306,7 +306,7 @@ def crear_grafica_agente(variable: str):
 
 # 2. CONFIGURACIÓN DEL AGENTE
 try:
-    api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
+    api_key = st.secrets.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
     
     model = genai.GenerativeModel(
@@ -335,7 +335,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("¿Qué análisis termodinámico necesitas?"):
+if prompt := st.chat_input("¿Ingeniero, que análisis termodinámico necesitas?"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -347,6 +347,7 @@ if prompt := st.chat_input("¿Qué análisis termodinámico necesitas?"):
         response = chat.send_message(contexto)
         st.markdown(response.text)
         st.session_state.messages.append({"role": "assistant", "content": response.text})
+
 
 
 
