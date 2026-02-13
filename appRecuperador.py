@@ -300,40 +300,43 @@ import altair as alt
 import ssl
 import requests
 
-# 1. DEFINICIÓN DE HERRAMIENTAS (Tools)
-
 def enviar_alerta_whatsapp(mensaje: str):
     """
-    Envía una notificación técnica oficial al equipo de EA Innovation.
-    Solo debe usarse para alertas críticas, anomalías detectadas o reportes de turno.
+    Versión Industrial EA Innovation - Corrección de Endpoint 404
     """
-    # Nota: Estos datos son de ejemplo. Deberás registrarte en UltraMsg (es gratis la prueba)
-    # para obtener tu propio Instance ID y Token.
-    INSTANCE_ID = "WHA_INSTANCE"
-    TOKEN = "WHA_INSTANCE"
-    PHONE = "WHA_INSTANCE" # Tu número
-
-    url = f"https://api.ultramsg.com/{INSTANCE_ID}/messages/chat"
-
-    # Formateamos el mensaje con el sello de la casa
-    cuerpo_mensaje = f"🚀 *EA INNOVATION - ALERTA TÉCNICA*\n\n{mensaje}\n\n_Accuracy is our signature._"
-
-    payload = {
-        "token": TOKEN,
-        "to": PHONE,
-        "body": cuerpo_mensaje
-    }
-
-    headers = {'content-type': 'application/x-www-form-urlencoded'}
-
     try:
-        response = requests.post(url, data=payload, headers=headers)
+        # 1. Limpieza absoluta de credenciales
+        instance = str(st.secrets["WHA_INSTANCE"]).strip()
+        token = str(st.secrets["WHA_TOKEN"]).strip()
+        phone = str(st.secrets["WHA_PHONE"]).replace("+", "").strip()
+        
+        # 2. Construcción de URL (Formato exacto UltraMsg)
+        # Verificamos que no falte ni sobre la palabra 'instance'
+        if not instance.startswith("instance"):
+            instance = f"instance{instance}"
+            
+        url = f"https://api.ultramsg.com/{instance}/messages/chat"
+        
+        # 3. Datos del envío
+        payload = {
+            "token": token,
+            "to": phone,
+            "body": mensaje
+        }
+        
+        headers = {'content-type': 'application/x-www-form-urlencoded'}
+
+        # 4. Petición con Timeout para evitar bloqueos
+        response = requests.post(url, data=payload, headers=headers, timeout=10)
+        
         if response.status_code == 200:
-            return "Notificación de ingeniería enviada con éxito."
+            return "✅ Alerta enviada con éxito al Ingeniero Armenta."
         else:
-            return f"Error en el servidor de mensajería (Status: {response.status_code})"
+            # Si da 404 aquí, es que el ID de la instancia es incorrecto en UltraMsg
+            return f"❌ Error {response.status_code}: La instancia {instance} no fue encontrada."
+            
     except Exception as e:
-        return f"Falla de conectividad en la alerta: {e}"
+        return f"⚠️ Falla de sistema: {str(e)}"
 
 
 
@@ -435,6 +438,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
