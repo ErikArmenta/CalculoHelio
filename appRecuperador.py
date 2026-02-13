@@ -102,6 +102,30 @@ def obtener_analisis_termodinamico(temp_c, presion_psi):
     # ... (tu fórmula de Factor Z)
     return {"volumen_m3": 12.34, "factor_z": 0.998} # Ejemplo de retorno
 
+
+def enviar_alerta_whatsapp(mensaje: str):
+    """Función de alerta para EA Innovation"""
+    # Si usas secretos en Streamlit Cloud:
+    try:
+        INSTANCE_ID = st.secrets["WHA_INSTANCE"]
+        TOKEN = st.secrets["WHA_TOKEN"]
+        PHONE = st.secrets["WHA_PHONE"]
+    except:
+        # Fallback por si pruebas local
+        INSTANCE_ID = "tu_instance_aqui"
+        TOKEN = "tu_token_aqui"
+        PHONE = "tu_numero_aqui"
+
+    url = f"https://api.ultramsg.com/{INSTANCE_ID}/messages/chat"
+    payload = {"token": TOKEN, "to": PHONE, "body": mensaje}
+    headers = {'content-type': 'application/x-www-form-urlencoded'}
+    
+    try:
+        response = requests.post(url, data=payload, headers=headers)
+        return "Alerta enviada" if response.status_code == 200 else f"Error: {response.status_code}"
+    except Exception as e:
+        return f"Error conexión: {e}"
+
 # --- 4. GESTIÓN DE ESTADO (SESSION STATE) ---
 if 'master_data' not in st.session_state:
     try:
@@ -411,6 +435,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
