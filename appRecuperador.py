@@ -140,6 +140,21 @@ if not df_vista.empty:
 
 st.divider()
 
+# --- LÓGICA DE CENTINELA (AUTOMÁTICA) ---
+if last['Consumo Absoluto M3'] > 5:
+    # Verificamos si ya mandamos esta alerta para no saturar
+    if "ultima_alerta" not in st.session_state or st.session_state.ultima_alerta != last['Marca temporal']:
+        mensaje_alerta = (
+            f"⚠️ *ANOMALÍA DETECTADA*\n"
+            f"Consumo: {last['Consumo Absoluto M3']:.2f} M3\n"
+            f"Presión: {last['Vessel Pressure']:.1f} PSIA\n"
+            f"Hora: {last['Marca temporal'].strftime('%H:%M:%S')}"
+        )
+        # Llamamos a la función que ya creamos
+        resultado = enviar_alerta_whatsapp(mensaje_alerta)
+        st.toast(resultado) # Nos avisa en la app que se envió
+        st.session_state.ultima_alerta = last['Marca temporal']
+
 # --- 7. TABLA EDITOR INTERACTIVO ---
 col_table, col_btn = st.columns([0.8, 0.2])
 
@@ -396,6 +411,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
