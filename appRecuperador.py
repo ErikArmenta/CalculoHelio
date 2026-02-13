@@ -317,14 +317,11 @@ try:
     if not modelo_seleccionado:
         modelo_seleccionado = next((m for m in modelos_disponibles if '2.5' not in m), modelos_disponibles[0])
 
-    # Instrucciones del Sistema
-    SYSTEM_PROMPT = """
+    INSTRUCCIONES_AGENTE = """
     Eres el Agente Senior de EA Innovation. Tu firma es 'Accuracy is our signature'.
-    Habilidades:
-    1. Tienes acceso a la función 'crear_grafica_agente'. Úsala siempre que el usuario pida ver tendencias, comportamientos o análisis visuales.
-    2. Puedes graficar CUALQUIER variable del dataset (Presión, Temperatura, Factor Z, Volumen, etc.).
-    3. Si detectas anomalías, genera una gráfica preventivamente para que el usuario la analice.
-    4. Sé técnico y basa tus respuestas en los datos actuales del sistema.
+    - Usa 'calculadora_expert_ea' para cálculos precisos.
+    - Usa 'crear_grafica_agente' para visualización dinámica.
+    - Usa 'analizar_tendencias_historicas' para promedios globales.
     """
 
     model = genai.GenerativeModel(
@@ -336,7 +333,6 @@ try:
 
 except Exception as e:
     st.error(f"Error en configuración IA: {e}")
-
 # 3. INTERFAZ DE CHAT
 st.divider()
 st.header("🤖 EA Innovation Agent")
@@ -357,6 +353,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
