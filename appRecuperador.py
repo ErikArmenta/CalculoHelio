@@ -298,30 +298,30 @@ def analizar_tendencias_historicas(metrica: str):
         }
     return "Métrica no válida."
 
-# C. CONFIGURACIÓN DEL CEREBRO (SELECTOR ROBUSTO)
+# C. CONFIGURACIÓN DEL CEREBRO (SELECTOR DE ALTA DISPONIBILIDAD)
 try:
     api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
     genai.configure(api_key=api_key)
 
-    # 1. Obtenemos todos los modelos que soportan generación de contenido
+    # 1. Listamos todos los modelos activos en tu cuenta
     modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
     
-    # 2. PRIORIDAD 1: Buscar el 1.5-flash estable (evitamos el 2.5 por la cuota)
-    # Buscamos cualquier nombre que contenga 'gemini-1.5-flash' y NO contenga '2.5'
+    # 2. PRIORIDAD: Buscamos el 1.5-flash (Tiene 1,500 solicitudes al día de cuota)
+    # Filtramos para NO usar el 2.0 o 2.5 que te están bloqueando
     modelo_seleccionado = next(
-        (m for m in modelos_disponibles if '1.5-flash' in m and '2.5' not in m), 
+        (m for m in modelos_disponibles if '1.5-flash' in m and '2.0' not in m and '2.5' not in m), 
         None
     )
 
-    # 3. FALLBACK: Si por algo no está el 1.5, usamos el primero que no sea 2.5
+    # 3. FALLBACK: Si no lo encuentra, usa cualquiera que no sea de la serie 2.x
     if not modelo_seleccionado:
-        modelo_seleccionado = next((m for m in modelos_disponibles if '2.5' not in m), modelos_disponibles[0])
+        modelo_seleccionado = next((m for m in modelos_disponibles if '1.5' in m), modelos_disponibles[0])
 
     INSTRUCCIONES_AGENTE = """
     Eres el Agente Senior de EA Innovation. Tu firma es 'Accuracy is our signature'.
-    - Usa 'calculadora_expert_ea' para cálculos precisos.
-    - Usa 'crear_grafica_agente' para visualización dinámica.
-    - Usa 'analizar_tendencias_historicas' para promedios globales.
+    - Usa 'calculadora_expert_ea' para cálculos precisos de termodinámica.
+    - Usa 'crear_grafica_agente' para visualización de tendencias de helio.
+    - Usa 'analizar_tendencias_historicas' para consultas de todo el dataset.
     """
 
     model = genai.GenerativeModel(
@@ -329,7 +329,7 @@ try:
         tools=[calculadora_expert_ea, crear_grafica_agente, analizar_tendencias_historicas],
         system_instruction=INSTRUCCIONES_AGENTE
     )
-    st.sidebar.success(f"IA Conectada: {modelo_seleccionado.split('/')[-1]}")
+    st.sidebar.success(f"IA Operativa: {modelo_seleccionado.split('/')[-1]}")
 
 except Exception as e:
     st.error(f"Error en configuración IA: {e}")
@@ -353,6 +353,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
