@@ -182,7 +182,7 @@ if not df_vista.empty:
             st.session_state.ultima_alerta_enviada = last['Marca temporal']
 
     # 3. Dibujamos la métrica final en c4 una sola vez
-    c4.metric(
+   # c4.metric(
         "Consumo Neto", 
         f"{consumo_actual:.2f} M3",
         "⚠️ ALTA" if alert_val else "OK", 
@@ -447,6 +447,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
