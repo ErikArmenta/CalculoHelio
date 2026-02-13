@@ -255,99 +255,72 @@ st.markdown(
 )
 
 
-# --- 10. EA INNOVATION AI AGENT (FULL POWER & HISTORY) ---
+# --- 10. EA INNOVATION AI AGENT (DYNAMIC VISUALIZATION) ---
 import google.generativeai as genai
 import altair as alt
-import pandas as pd
 import ssl
 import os
 
-# A. BYPASS DE SEGURIDAD
-try:
-    _create_unverified_https_context = ssl._create_unverified_context
-except AttributeError:
-    pass
-else:
-    ssl._create_default_https_context = _create_unverified_https_context
-
-# B. DEFINICIÓN DE HERRAMIENTAS (Deben ir primero)
-
-def analizar_tendencias_historicas(metrica: str):
-    """Calcula estadísticas de TODO el historial para una métrica específica."""
-    if metrica in df_full.columns:
-        resumen = {
-            "Metrica": metrica,
-            "Promedio_Historico": round(df_full[metrica].mean(), 2),
-            "Maximo": round(df_full[metrica].max(), 2),
-            "Minimo": round(df_full[metrica].min(), 2),
-            "Total_Registros": len(df_full)
-        }
-        return resumen
-    return "Métrica no encontrada."
-
-def calculadora_expert_ea(temp_c: float, presion_psi: float):
-    """Calcula los factores termodinámicos exactos (Z, Fv, M3) usando la lógica de Erik Armenta."""
-    BASE_VOLUME = 450.00
-    temp_f = temp_c * 1.8 + 32
-    vessel_pres = presion_psi + 14.7
-    t_term = 459.7 + temp_f
-    
-    part1 = 0.000102297 - (0.000000192998 * t_term) + (0.00000000011836 * (t_term**2))
-    z_factor = 1 + (part1 * vessel_pres) - (0.0000000002217 * (vessel_pres**2))
-    
-    f_temp = 529.7 / (temp_f + 459.7)
-    f_pres = vessel_pres / 14.7
-    f_comp = 1.00049 / z_factor
-    f_exp_metal = 1 + (0.0000189 * (temp_f - 70))
-    f_pres_efect = 1 + (0.00000074 * vessel_pres)
-    fv = f_temp * f_pres * f_comp * f_exp_metal * f_pres_efect
-    
-    vol_m3 = (BASE_VOLUME * fv) / 35.315
-    return {"Factor_Z": round(z_factor, 6), "Factor_Fv": round(fv, 4), "Volumen_M3": round(vol_m3, 4)}
-
-def crear_grafica_agente(variable: str):
-    """Genera una gráfica de tendencia instantánea para análisis visual de datos."""
-    if variable in df_vista.columns:
+# 1. Herramienta de Visualización Dinámica
+def crear_grafica_agente(variable_y: str, variable_x: str = 'Marca temporal'):
+    """
+    Genera una gráfica interactiva basada en cualquier variable del sistema.
+    Variables disponibles: Temperatura Celsius, Presión, Factor Z, Volumen M3, Consumo Absoluto M3, etc.
+    """
+    # Verificación de columnas para evitar errores de ejecución
+    if variable_y in df_vista.columns and variable_x in df_vista.columns:
         chart = alt.Chart(df_vista).mark_line(point=True, color='#5271ff').encode(
-            x=alt.X('Marca temporal:T', title='Tiempo'),
-            y=alt.Y(f'{variable}:Q', title=variable, scale=alt.Scale(zero=False)),
-            tooltip=['Marca temporal', variable]
-        ).interactive().properties(height=300)
+            x=alt.X(f'{variable_x}:T' if 'temporal' in variable_x else f'{variable_x}:Q', title=variable_x),
+            y=alt.Y(f'{variable_y}:Q', title=variable_y, scale=alt.Scale(zero=False)),
+            tooltip=[variable_x, variable_y]
+        ).interactive().properties(height=350)
+        
         st.altair_chart(chart, use_container_width=True)
-        return f"Gráfica de {variable} generada correctamente."
-    return f"La variable {variable} no existe."
+        return f"He generado la gráfica de {variable_y} vs {variable_x} exitosamente."
+    else:
+        return f"Error: Una de las variables ({variable_y} o {variable_x}) no se encuentra en el dataset actual."
 
-# C. CONFIGURACIÓN DEL CEREBRO (Ahora que las funciones existen, las vinculamos)
+# 2. Configuración del Agente con Tools
 try:
+    # Bypass SSL para redes locales
+    try:
+        _create_unverified_https_context = ssl._create_unverified_context
+    except AttributeError:
+        pass
+    else:
+        ssl._create_default_https_context = _create_unverified_https_context
+
+    # API Key
     api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
     genai.configure(api_key=api_key)
-    
+
+    # Detección dinámica de modelo para evitar error 404
     modelos_visibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    modelo_final = next((m for m in modelos_visibles if 'gemini-1.5-flash' in m), modelos_visibles[0])
-    
-    INSTRUCCIONES_AGENTE = """
+    modelo_nombre = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in modelos_visibles else modelos_visibles[0]
+
+    # Instrucciones del Sistema
+    SYSTEM_PROMPT = """
     Eres el Agente Senior de EA Innovation. Tu firma es 'Accuracy is our signature'.
-    - Usa 'calculadora_expert_ea' para cálculos puntuales.
-    - Usa 'crear_grafica_agente' para ver tendencias recientes.
-    - Usa 'analizar_tendencias_historicas' si el usuario pregunta por promedios, máximos o mínimos de TODO el historial.
-    - Si la presión baja de 1000 PSI, advierte mantenimiento.
+    Habilidades:
+    1. Tienes acceso a la función 'crear_grafica_agente'. Úsala siempre que el usuario pida ver tendencias, comportamientos o análisis visuales.
+    2. Puedes graficar CUALQUIER variable del dataset (Presión, Temperatura, Factor Z, Volumen, etc.).
+    3. Si detectas anomalías, genera una gráfica preventivamente para que el usuario la analice.
+    4. Sé técnico y basa tus respuestas en los datos actuales del sistema.
     """
-    
-    # Vinculamos las 3 herramientas
+
     model = genai.GenerativeModel(
-        model_name=modelo_final,
-        tools=[calculadora_expert_ea, crear_grafica_agente, analizar_tendencias_historicas],
-        system_instruction=INSTRUCCIONES_AGENTE
+        model_name=modelo_nombre,
+        tools=[crear_grafica_agente],
+        system_instruction=SYSTEM_PROMPT
     )
-    st.sidebar.success(f"IA Conectada: {modelo_final.split('/')[-1]}")
 
 except Exception as e:
-    st.error(f"Error en configuración IA: {e}")
+    st.error(f"Error inicializando IA: {e}")
 
-# D. INTERFAZ DE USUARIO DEL CHAT
+# 3. Interfaz de Chat
 st.divider()
 st.header("🤖 EA Innovation Agent")
-st.caption("Inteligencia Termodinámica Aplicada | Accuracy is our signature.")
+st.caption("Visualización Dinámica & Análisis Termodinámico Activo")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -356,21 +329,27 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("¿Ingeniero, qué análisis termodinámico necesita?"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+if chat_input := st.chat_input("¿Ingeniero, qué variable desea graficar o analizar?"):
+    st.session_state.messages.append({"role": "user", "content": chat_input})
     with st.chat_message("user"):
-        st.markdown(prompt)
+        st.markdown(chat_input)
 
     with st.chat_message("assistant"):
         try:
+            # Habilitamos el llamado automático de funciones
             chat = model.start_chat(enable_automatic_function_calling=True)
-            # Pasamos los últimos 10 datos como contexto rápido
-            contexto = f"DATOS RECIENTES: \n{df_vista.tail(10).to_string(index=False)}\n\nPREGUNTA: {prompt}"
-            response = chat.send_message(contexto)
+            
+            # Contexto con los últimos 10 datos
+            contexto_datos = df_vista.tail(10).to_string(index=False)
+            prompt_completo = f"DATOS ACTUALES:\n{contexto_datos}\n\nPREGUNTA: {chat_input}"
+
+            response = chat.send_message(prompt_completo)
+
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
+
         except Exception as e:
-            st.error(f"El Agente encontró un obstáculo técnico: {e}")
+            st.error(f"Error en el Agente: {e}")
 
 
 
