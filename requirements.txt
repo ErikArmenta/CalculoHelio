@@ -3,3 +3,5 @@ pandas
 altair
 google-generativeai
 pip-system-certs
+requests
+
