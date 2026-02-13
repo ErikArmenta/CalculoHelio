@@ -145,37 +145,29 @@ elif view_option == "Últimos 7 Días":
 else:
     df_vista = df_full.copy()
 
-# --- 6. KPI DASHBOARD ---
+# --- 6. KPI DASHBOARD (UNIFICADO) ---
 st.title("🛡️ Helium Recovery System")
 st.caption("Industrial Monitoring & Thermodynamic Calculation Engine")
 
 if not df_vista.empty:
     last = df_vista.iloc[-1]
+    
+    # Definimos las 4 columnas una sola vez
     c1, c2, c3, c4 = st.columns(4)
+    
+    # 1. Métricas estándar
     c1.metric("Volumen M3", f"{last['Volume in Cubic Meters ( M3 )']:.2f}", f"{last['Diferencia M3']:.4f}")
     c2.metric("Presión Absoluta", f"{last['Vessel Pressure']:.1f} PSIA")
     c3.metric("Factor Fv", f"{last['Volume Factor (Fv)']:.4f}")
 
-    alert_val = last['Consumo Absoluto M3'] > 5
-    c4.metric("Consumo Neto", f"{last['Consumo Absoluto M3']:.2f} M3",
-              "⚠️ ALTA" if alert_val else "OK", delta_color="inverse" if alert_val else "normal")
-
-st.divider()
-
-# --- 6. KPI DASHBOARD ---
-if not df_vista.empty:
-    last = df_vista.iloc[-1]
-    # ... (tus columnas c1, c2, c3 actuales) ...
-
+    # 2. Lógica de Alerta y Centinela
     consumo_actual = last['Consumo Absoluto M3']
     alert_val = consumo_actual > 5
     
-    # --- DISPARO AUTOMÁTICO (EL REPARABLE) ---
     if alert_val:
-        # Usamos session_state para que solo mande UN mensaje por cada marca temporal nueva
+        # Solo dispara si es un registro nuevo (Marca temporal diferente)
         if "ultima_alerta_enviada" not in st.session_state or st.session_state.ultima_alerta_enviada != last['Marca temporal']:
             
-            # Construimos el mensaje técnico
             msg_automatico = (
                 f"🚨 *ALERTA AUTOMÁTICA EA*\n"
                 f"Consumo Detectado: {consumo_actual:.2f} M3\n"
@@ -184,15 +176,18 @@ if not df_vista.empty:
                 f"Hora: {last['Marca temporal'].strftime('%H:%M:%S')}"
             )
             
-            # Ejecutamos la función
+            # Ejecución del servicio de WhatsApp
             resultado_envio = enviar_alerta_whatsapp(msg_automatico)
-            st.toast(resultado_envio) # Notificación visual en la esquina de la app
-            
-            # Guardamos que ya avisamos sobre este dato específico
+            st.toast(resultado_envio)
             st.session_state.ultima_alerta_enviada = last['Marca temporal']
 
-
-
+    # 3. Dibujamos la métrica final en c4 una sola vez
+    c4.metric(
+        "Consumo Neto", 
+        f"{consumo_actual:.2f} M3",
+        "⚠️ ALTA" if alert_val else "OK", 
+        delta_color="inverse" if alert_val else "normal"
+    )
 # --- 7. TABLA EDITOR INTERACTIVO ---
 col_table, col_btn = st.columns([0.8, 0.2])
 
@@ -452,6 +447,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
