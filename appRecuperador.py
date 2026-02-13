@@ -259,8 +259,45 @@ st.markdown(
 import google.generativeai as genai
 import altair as alt
 import ssl
+import requests
 
 # 1. DEFINICIÓN DE HERRAMIENTAS (Tools)
+
+def enviar_alerta_whatsapp(mensaje: str):
+    """
+    Envía una notificación técnica oficial al equipo de EA Innovation.
+    Solo debe usarse para alertas críticas, anomalías detectadas o reportes de turno.
+    """
+    # Nota: Estos datos son de ejemplo. Deberás registrarte en UltraMsg (es gratis la prueba)
+    # para obtener tu propio Instance ID y Token.
+    INSTANCE_ID = "WHA_INSTANCE"
+    TOKEN = "WHA_INSTANCE"
+    PHONE = "WHA_INSTANCE" # Tu número
+
+    url = f"https://api.ultramsg.com/{INSTANCE_ID}/messages/chat"
+
+    # Formateamos el mensaje con el sello de la casa
+    cuerpo_mensaje = f"🚀 *EA INNOVATION - ALERTA TÉCNICA*\n\n{mensaje}\n\n_Accuracy is our signature._"
+
+    payload = {
+        "token": TOKEN,
+        "to": PHONE,
+        "body": cuerpo_mensaje
+    }
+
+    headers = {'content-type': 'application/x-www-form-urlencoded'}
+
+    try:
+        response = requests.post(url, data=payload, headers=headers)
+        if response.status_code == 200:
+            return "Notificación de ingeniería enviada con éxito."
+        else:
+            return f"Error en el servidor de mensajería (Status: {response.status_code})"
+    except Exception as e:
+        return f"Falla de conectividad en la alerta: {e}"
+
+
+
 def calculadora_expert_ea(temp_c: float, presion_psi: float):
     """Calcula Z, Fv y M3 usando las fórmulas propietarias de Erik Armenta."""
     BASE_VOLUME = 450.00
@@ -305,11 +342,11 @@ try:
 
     # 1. Listamos todos los modelos activos en tu cuenta
     modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    
+
     # 2. PRIORIDAD: Buscamos el 1.5-flash (Tiene 1,500 solicitudes al día de cuota)
     # Filtramos para NO usar el 2.0 o 2.5 que te están bloqueando
     modelo_seleccionado = next(
-        (m for m in modelos_disponibles if '1.5-flash' in m and '2.0' not in m and '2.5' not in m), 
+        (m for m in modelos_disponibles if '1.5-flash' in m and '2.0' not in m and '2.5' not in m),
         None
     )
 
@@ -318,15 +355,21 @@ try:
         modelo_seleccionado = next((m for m in modelos_disponibles if '1.5' in m), modelos_disponibles[0])
 
     INSTRUCCIONES_AGENTE = """
-    Eres el Agente Senior de EA Innovation. Tu firma es 'Accuracy is our signature'.
-    - Usa 'calculadora_expert_ea' para cálculos precisos de termodinámica.
-    - Usa 'crear_grafica_agente' para visualización de tendencias de helio.
-    - Usa 'analizar_tendencias_historicas' para consultas de todo el dataset.
-    """
+    Eres el Agente Senior de EA Innovation. 'Accuracy is our signature'.
+        - Tienes acceso a herramientas de cálculo, gráficas y análisis histórico.
+        - NUEVA CAPACIDAD: Puedes enviar alertas de WhatsApp ante anomalías.
+        - Si el usuario te pide 'Avisame si esto vuelve a pasar' o si detectas un consumo > 5 M3,
+          ejecuta 'enviar_alerta_whatsapp' con un resumen técnico.
+        """
 
     model = genai.GenerativeModel(
         model_name=modelo_seleccionado,
-        tools=[calculadora_expert_ea, crear_grafica_agente, analizar_tendencias_historicas],
+        tools=[
+            calculadora_expert_ea,
+            crear_grafica_agente,
+            analizar_tendencias_historicas,
+            enviar_alerta_whatsapp  # <-- PODER AÑADIDO
+        ],
         system_instruction=INSTRUCCIONES_AGENTE
     )
     st.sidebar.success(f"IA Operativa: {modelo_seleccionado.split('/')[-1]}")
