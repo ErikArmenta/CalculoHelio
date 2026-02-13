@@ -298,29 +298,41 @@ def analizar_tendencias_historicas(metrica: str):
         }
     return "Métrica no válida."
 
-# C. CONFIGURACIÓN DEL CEREBRO (FIJADO EN 1.5 FLASH PARA MÁXIMA CUOTA)
+# C. CONFIGURACIÓN DEL CEREBRO (SELECTOR ROBUSTO)
 try:
     api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
     genai.configure(api_key=api_key)
 
-    # Forzamos manualmente el modelo estable. 
-    # Esto evita que 'list_models' elija versiones experimentales con cuotas bajas.
-    modelo_nombre = 'models/gemini-1.5-flash'
+    # 1. Obtenemos todos los modelos que soportan generación de contenido
+    modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    
+    # 2. PRIORIDAD 1: Buscar el 1.5-flash estable (evitamos el 2.5 por la cuota)
+    # Buscamos cualquier nombre que contenga 'gemini-1.5-flash' y NO contenga '2.5'
+    modelo_seleccionado = next(
+        (m for m in modelos_disponibles if '1.5-flash' in m and '2.5' not in m), 
+        None
+    )
 
-    INSTRUCCIONES_AGENTE = """
+    # 3. FALLBACK: Si por algo no está el 1.5, usamos el primero que no sea 2.5
+    if not modelo_seleccionado:
+        modelo_seleccionado = next((m for m in modelos_disponibles if '2.5' not in m), modelos_disponibles[0])
+
+    # Instrucciones del Sistema
+    SYSTEM_PROMPT = """
     Eres el Agente Senior de EA Innovation. Tu firma es 'Accuracy is our signature'.
-    - Usa 'calculadora_expert_ea' para cálculos precisos de Helio (Z, Fv, M3).
-    - Usa 'crear_grafica_agente' para visualización de tendencias.
-    - Usa 'analizar_tendencias_historicas' para promedios globales.
-    - Si la presión baja de 1000 PSI, advierte sobre mantenimiento.
+    Habilidades:
+    1. Tienes acceso a la función 'crear_grafica_agente'. Úsala siempre que el usuario pida ver tendencias, comportamientos o análisis visuales.
+    2. Puedes graficar CUALQUIER variable del dataset (Presión, Temperatura, Factor Z, Volumen, etc.).
+    3. Si detectas anomalías, genera una gráfica preventivamente para que el usuario la analice.
+    4. Sé técnico y basa tus respuestas en los datos actuales del sistema.
     """
 
     model = genai.GenerativeModel(
-        model_name=modelo_nombre,
+        model_name=modelo_seleccionado,
         tools=[calculadora_expert_ea, crear_grafica_agente, analizar_tendencias_historicas],
         system_instruction=INSTRUCCIONES_AGENTE
     )
-    st.sidebar.success(f"IA Conectada: {modelo_nombre}")
+    st.sidebar.success(f"IA Conectada: {modelo_seleccionado.split('/')[-1]}")
 
 except Exception as e:
     st.error(f"Error en configuración IA: {e}")
@@ -345,6 +357,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
