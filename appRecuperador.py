@@ -298,26 +298,32 @@ def analizar_tendencias_historicas(metrica: str):
         }
     return "Métrica no válida."
 
-# 2. CONFIGURACIÓN DEL MODELO
+# C. CONFIGURACIÓN DEL CEREBRO (FIJADO EN 1.5 FLASH PARA MÁXIMA CUOTA)
 try:
-    try: _create_unverified_https_context = ssl._create_unverified_context
-    except AttributeError: pass
-    else: ssl._create_default_https_context = _create_unverified_https_context
-
     api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
     genai.configure(api_key=api_key)
 
-    modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    modelo_nombre = next((m for m in modelos if 'gemini-1.5-flash' in m), modelos[0])
+    # Forzamos manualmente el modelo estable. 
+    # Esto evita que 'list_models' elija versiones experimentales con cuotas bajas.
+    modelo_nombre = 'models/gemini-1.5-flash'
 
-    INSTRUCCIONES = """Eres el Agente Senior de EA Innovation. Firma: 'Accuracy is our signature'.
-    1. Cálculos puntuales: Usa 'calculadora_expert_ea'.
-    2. Visualización: Usa 'crear_grafica_agente' para CUALQUIER variable que pida el usuario.
-    3. Historial largo: Usa 'analizar_tendencias_historicas' para promedios de todo el historial.
-    4. Si la presión < 1000 PSI, advierte preventivamente."""
+    INSTRUCCIONES_AGENTE = """
+    Eres el Agente Senior de EA Innovation. Tu firma es 'Accuracy is our signature'.
+    - Usa 'calculadora_expert_ea' para cálculos precisos de Helio (Z, Fv, M3).
+    - Usa 'crear_grafica_agente' para visualización de tendencias.
+    - Usa 'analizar_tendencias_historicas' para promedios globales.
+    - Si la presión baja de 1000 PSI, advierte sobre mantenimiento.
+    """
 
-    model = genai.GenerativeModel(model_name=modelo_nombre, tools=[calculadora_expert_ea, crear_grafica_agente, analizar_tendencias_historicas], system_instruction=INSTRUCCIONES)
-except Exception as e: st.error(f"Error IA: {e}")
+    model = genai.GenerativeModel(
+        model_name=modelo_nombre,
+        tools=[calculadora_expert_ea, crear_grafica_agente, analizar_tendencias_historicas],
+        system_instruction=INSTRUCCIONES_AGENTE
+    )
+    st.sidebar.success(f"IA Conectada: {modelo_nombre}")
+
+except Exception as e:
+    st.error(f"Error en configuración IA: {e}")
 
 # 3. INTERFAZ DE CHAT
 st.divider()
@@ -339,6 +345,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
