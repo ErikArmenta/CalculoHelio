@@ -445,7 +445,7 @@ def analizar_tendencias_historicas(metrica: str):
 
 # C. CONFIGURACIÓN DEL CEREBRO (SELECTOR DE ALTA DISPONIBILIDAD)
 try:
-    api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyDS89Yu4ogJMHAwXtoqV0D03nfSjje8jMY")
+    api_key = st.secrets.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
 
     # 1. Listamos todos los modelos activos en tu cuenta
@@ -504,6 +504,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
