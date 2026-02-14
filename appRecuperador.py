@@ -49,7 +49,7 @@ with st.sidebar:
 sheet_id = "11LjeT8pJLituxpCxYKxWAC8ZMFkgtts6sJn3X-F35A4"
 csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=430617011"
 
-@st.cache_data(ttl=60)
+@st.cache_data()
 def fetch_raw_data():
     df = pd.read_csv(csv_url)
     df['Marca temporal'] = pd.to_datetime(df['Marca temporal'])
@@ -447,6 +447,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
