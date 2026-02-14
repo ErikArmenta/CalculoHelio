@@ -49,7 +49,7 @@ with st.sidebar:
 sheet_id = "11LjeT8pJLituxpCxYKxWAC8ZMFkgtts6sJn3X-F35A4"
 csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=430617011"
 
-@st.cache_data()
+# @st.cache_data()
 def fetch_raw_data():
     df = pd.read_csv(csv_url)
     df['Marca temporal'] = pd.to_datetime(df['Marca temporal'])
@@ -286,6 +286,63 @@ multi_chart = alt.Chart(df_melted).mark_line(point=True).encode(
 
 st.altair_chart(multi_chart, use_container_width=True)
 
+# --- 9.5. REPRODUCCIÓN HISTÓRICA MULTIVARIABLE (PLAYBACK ANIMADO EA) ---
+import time
+
+st.divider()
+st.subheader("🎬 Playback Termodinámico Animado")
+st.info("Análisis dinámico cuadro por cuadro de los Factores Z, Fv y Consumo Absoluto.")
+
+# Controles de reproducción
+col_anim1, col_anim2 = st.columns([0.2, 0.8])
+start_anim = col_anim1.button("▶️ Iniciar Análisis Animado")
+velocidad = col_anim2.select_slider("Velocidad de flujo de datos:",
+                                    options=["Lento", "Normal", "Rápido"], value="Normal")
+
+# Tiempos de actualización
+delay = {"Lento": 0.4, "Normal": 0.15, "Rápido": 0.05}[velocidad]
+
+if start_anim:
+    placeholder = st.empty()
+
+    # 1. Preparamos las columnas de interés para el análisis
+    cols_interes = ['Marca temporal', 'Compressibility Factor (Z)',
+                    'Volume Factor (Fv)', 'Consumo Absoluto M3']
+
+    # 2. Tomamos una muestra para fluidez (cada 2 registros)
+    df_anim_raw = df_full[cols_interes].iloc[::2, :].reset_index(drop=True)
+
+    # 3. Definimos colores industriales para EA Innovation
+    color_scale_anim = alt.Scale(
+        domain=['Compressibility Factor (Z)', 'Volume Factor (Fv)', 'Consumo Absoluto M3'],
+        range=['#2ecc71', '#e67e22', '#e74c3c'] # Verde Esmeralda, Naranja, Rojo
+    )
+
+    for i in range(2, len(df_anim_raw) + 1):
+        # Filtramos hasta el punto actual
+        current_data = df_anim_raw.iloc[:i]
+
+        # "Derretimos" los datos para que Altair los grafique juntos
+        df_melted_anim = current_data.melt(
+            id_vars=['Marca temporal'],
+            var_name='Variable Termodinámica',
+            value_name='Valor'
+        )
+
+        # 4. Construimos la gráfica con puntos y líneas (Solicitado)
+        anim_chart = alt.Chart(df_melted_anim).mark_line(point=True).encode(
+            x=alt.X('Marca temporal:T', title='Eje del Tiempo (Historial)'),
+            y=alt.Y('Valor:Q', title='Escala Unificada', scale=alt.Scale(zero=False)),
+            color=alt.Color('Variable Termodinámica:N', scale=color_scale_anim, title="Variables EA"),
+            tooltip=['Marca temporal:T', 'Variable Termodinámica:N', alt.Tooltip('Valor:Q', format='.4f')]
+        ).properties(height=450, title="Evolución Dinámica de Factores y Consumo")
+
+        # Renderizado dinámico
+        placeholder.altair_chart(anim_chart, use_container_width=True)
+        time.sleep(delay)
+
+    st.success("✅ Análisis animado completado. Se han procesado todos los puntos críticos del historial.")
+
 
 # --- 9. FIRMA ---
 st.markdown(
@@ -447,6 +504,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
