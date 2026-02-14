@@ -519,6 +519,7 @@ try:
     Eres el Agente Senior de EA Innovation. 'Accuracy is our signature'.
         - Tienes acceso a herramientas de cálculo, gráficas y análisis histórico.
         - NUEVA CAPACIDAD: Puedes enviar alertas de WhatsApp ante anomalías.
+        - REGLA DE ORO: Si detectas un consumo > 5 M3 o una anomalía crítica, ES OBLIGATORIO que primero ejecutes la herramienta 'enviar_alerta_whatsapp' ANTES de dar tu respuesta de texto. No solo digas que la enviaste, ¡ejecútala!
         - Si el usuario te pide 'Avisame si esto vuelve a pasar' o si detectas un consumo > 5 M3,
           ejecuta 'enviar_alerta_whatsapp' con un resumen técnico.
         - CUANDO EL USUARIO PREGUNTE POR LAS GRÁFICAS DE TABS O ESTADÍSTICA: Usa 'obtener_diagnostico_avanzado' para leer la estabilidad (boxplot) y frecuencia (histograma).
@@ -560,6 +561,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
