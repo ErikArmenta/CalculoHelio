@@ -12,38 +12,38 @@ import os
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="Helium Recovery System | Monitoring",
-    page_icon="🚀",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Helium Recovery System | Monitoring",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # --- 2. SIDEBAR ---
 with st.sidebar:
-    logo_path = "EA_2.png"
-    if os.path.exists(logo_path):
-        st.image(logo_path, use_container_width=True)
-    else:
-        st.warning("Coloca 'EA_2.png' en la raíz")
+    logo_path = "EA_2.png"
+    if os.path.exists(logo_path):
+        st.image(logo_path, use_container_width=True)
+    else:
+        st.warning("Coloca 'EA_2.png' en la raíz")
 
-    st.title("Control Panel")
-    st.markdown("---")
+    st.title("Control Panel")
+    st.markdown("---")
 
-    view_option = st.selectbox(
-        "Mostrar datos de:",
-        ["Últimas 24 Horas", "Últimos 7 Días", "Todo el Historial"]
-    )
+    view_option = st.selectbox(
+        "Mostrar datos de:",
+        ["Últimas 24 Horas", "Últimos 7 Días", "Todo el Historial"]
+    )
 
-    if st.button("🔄 Recargar Datos Originales"):
-        st.cache_data.clear()
-        if 'master_data' in st.session_state:
-            del st.session_state['master_data']
-        st.rerun()
+    if st.button("🔄 Recargar Datos Originales"):
+        st.cache_data.clear()
+        if 'master_data' in st.session_state:
+            del st.session_state['master_data']
+        st.rerun()
 
-    st.markdown("---")
-    st.write("**Engineer in Charge:**")
-    st.info("Erik Armenta")
-    st.caption("_Accuracy is our signature, and innovation is our nature._")
+    st.markdown("---")
+    st.write("**Engineer in Charge:**")
+    st.info("Erik Armenta")
+    st.caption("_Accuracy is our signature, and innovation is our nature._")
 
 # --- 3. LÓGICA TERMODINÁMICA (Mantenida intacta) ---
 sheet_id = "11LjeT8pJLituxpCxYKxWAC8ZMFkgtts6sJn3X-F35A4"
@@ -51,99 +51,99 @@ csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&
 
 @st.cache_data(ttl=60)
 def fetch_raw_data():
-    df = pd.read_csv(csv_url)
-    df['Marca temporal'] = pd.to_datetime(df['Marca temporal'])
-    df = df.sort_values('Marca temporal').reset_index(drop=True)
-    return df
+    df = pd.read_csv(csv_url)
+    df['Marca temporal'] = pd.to_datetime(df['Marca temporal'])
+    df = df.sort_values('Marca temporal').reset_index(drop=True)
+    return df
 
 def calculate_thermodynamics(df_input):
-    df = df_input.copy()
-    df['Marca temporal'] = pd.to_datetime(df['Marca temporal'])
-    df = df.sort_values('Marca temporal') # Re-ordenar por si cambió el tiempo
+    df = df_input.copy()
+    df['Marca temporal'] = pd.to_datetime(df['Marca temporal'])
+    df = df.sort_values('Marca temporal') # Re-ordenar por si cambió el tiempo
 
-    cols_check = ['Temperatura Celsius', 'Presión']
-    for col in cols_check:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
+    cols_check = ['Temperatura Celsius', 'Presión']
+    for col in cols_check:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    df = df.dropna(subset=cols_check)
-    BASE_VOLUME = 450.00
+    df = df.dropna(subset=cols_check)
+    BASE_VOLUME = 450.00
 
-    df['Temperatura Fahrenheit'] = df['Temperatura Celsius'] * 1.8 + 32
-    df['Temperature Over'] = df['Temperatura Fahrenheit']
-    df['Vessel Pressure'] = df['Presión'] + 14.7
+    df['Temperatura Fahrenheit'] = df['Temperatura Celsius'] * 1.8 + 32
+    df['Temperature Over'] = df['Temperatura Fahrenheit']
+    df['Vessel Pressure'] = df['Presión'] + 14.7
 
-    t_term = 459.7 + df['Temperature Over']
-    part1 = 0.000102297 - (0.000000192998 * t_term) + (0.00000000011836 * (t_term**2))
-    df['Compressibility Factor (Z)'] = 1 + (part1 * df['Vessel Pressure']) - (0.0000000002217 * (df['Vessel Pressure']**2))
+    t_term = 459.7 + df['Temperature Over']
+    part1 = 0.000102297 - (0.000000192998 * t_term) + (0.00000000011836 * (t_term**2))
+    df['Compressibility Factor (Z)'] = 1 + (part1 * df['Vessel Pressure']) - (0.0000000002217 * (df['Vessel Pressure']**2))
 
-    f_temp = 529.7 / (df['Temperature Over'] + 459.7)
-    f_pres = df['Vessel Pressure'] / 14.7
-    f_comp = 1.00049 / df['Compressibility Factor (Z)']
-    f_exp_metal = 1 + (0.0000189 * (df['Temperature Over'] - 70))
-    f_pres_efect = 1 + (0.00000074 * df['Vessel Pressure'])
-    df['Volume Factor (Fv)'] = f_temp * f_pres * f_comp * f_exp_metal * f_pres_efect
+    f_temp = 529.7 / (df['Temperature Over'] + 459.7)
+    f_pres = df['Vessel Pressure'] / 14.7
+    f_comp = 1.00049 / df['Compressibility Factor (Z)']
+    f_exp_metal = 1 + (0.0000189 * (df['Temperature Over'] - 70))
+    f_pres_efect = 1 + (0.00000074 * df['Vessel Pressure'])
+    df['Volume Factor (Fv)'] = f_temp * f_pres * f_comp * f_exp_metal * f_pres_efect
 
-    df['Volume Helium ft3'] = (BASE_VOLUME * df['Volume Factor (Fv)'])
-    df['Volume in Cubic Meters ( M3 )'] = df['Volume Helium ft3'] / 35.315
+    df['Volume Helium ft3'] = (BASE_VOLUME * df['Volume Factor (Fv)'])
+    df['Volume in Cubic Meters ( M3 )'] = df['Volume Helium ft3'] / 35.315
 
-    df['Diferencia M3'] = df['Volume in Cubic Meters ( M3 )'].diff().fillna(0)
-    df['Consumo Absoluto M3'] = df['Diferencia M3'].abs()
+    df['Diferencia M3'] = df['Volume in Cubic Meters ( M3 )'].diff().fillna(0)
+    df['Consumo Absoluto M3'] = df['Diferencia M3'].abs()
 
-    return df.reset_index(drop=True)
+    return df.reset_index(drop=True)
 
 def obtener_analisis_termodinamico(temp_c, presion_psi):
-    """
-    Calcula el volumen y factor de compresibilidad usando la lógica de EA Innovation.
-    """
-    # Aquí encapsulas la lógica que ya tienes en 'calculate_thermodynamics'
-    # para un solo punto de dato si el usuario pregunta algo específico.
-    vessel_pres = presion_psi + 14.7
-    t_term = 459.7 + (temp_c * 1.8 + 32)
-    # ... (tu fórmula de Factor Z)
-    return {"volumen_m3": 12.34, "factor_z": 0.998} # Ejemplo de retorno
+    """
+    Calcula el volumen y factor de compresibilidad usando la lógica de EA Innovation.
+    """
+    # Aquí encapsulas la lógica que ya tienes en 'calculate_thermodynamics'
+    # para un solo punto de dato si el usuario pregunta algo específico.
+    vessel_pres = presion_psi + 14.7
+    t_term = 459.7 + (temp_c * 1.8 + 32)
+    # ... (tu fórmula de Factor Z)
+    return {"volumen_m3": 12.34, "factor_z": 0.998} # Ejemplo de retorno
 
 
 # --- SECCIÓN 3.5: SERVICIO DE ALERTAS EA INNOVATION ---
 import requests
 
 def enviar_alerta_whatsapp(mensaje: str):
-    try:
-        instance = str(st.secrets["WHA_INSTANCE"]).strip()
-        token = str(st.secrets["WHA_TOKEN"]).strip()
-        phone = str(st.secrets["WHA_PHONE"]).replace("+", "").strip()
+    try:
+        instance = str(st.secrets["WHA_INSTANCE"]).strip()
+        token = str(st.secrets["WHA_TOKEN"]).strip()
+        phone = str(st.secrets["WHA_PHONE"]).replace("+", "").strip()
 
-        if not instance.startswith("instance"):
-            instance = f"instance{instance}"
+        if not instance.startswith("instance"):
+            instance = f"instance{instance}"
 
-        url = f"https://api.ultramsg.com/{instance}/messages/chat"
-        payload = {"token": token, "to": phone, "body": mensaje}
-        headers = {'content-type': 'application/x-www-form-urlencoded'}
+        url = f"https://api.ultramsg.com/{instance}/messages/chat"
+        payload = {"token": token, "to": phone, "body": mensaje}
+        headers = {'content-type': 'application/x-www-form-urlencoded'}
 
-        response = requests.post(url, data=payload, headers=headers, timeout=10)
-        return "✅ Alerta enviada" if response.status_code == 200 else f"❌ Error {response.status_code}"
-    except Exception as e:
-        return f"⚠️ Falla: {str(e)}"
+        response = requests.post(url, data=payload, headers=headers, timeout=10)
+        return "✅ Alerta enviada" if response.status_code == 200 else f"❌ Error {response.status_code}"
+    except Exception as e:
+        return f"⚠️ Falla: {str(e)}"
 
 # --- 4. GESTIÓN DE ESTADO (SESSION STATE) ---
 if 'master_data' not in st.session_state:
-    try:
-        raw_df = fetch_raw_data()
-        st.session_state.master_data = calculate_thermodynamics(raw_df)
-    except Exception as e:
-        st.error(f"Error cargando datos: {e}")
-        st.stop()
+    try:
+        raw_df = fetch_raw_data()
+        st.session_state.master_data = calculate_thermodynamics(raw_df)
+    except Exception as e:
+        st.error(f"Error cargando datos: {e}")
+        st.stop()
 
 df_full = st.session_state.master_data
 
 # --- 5. FILTRADO ---
 if view_option == "Últimas 24 Horas":
-    cutoff = pd.Timestamp.now() - pd.Timedelta(hours=24)
-    df_vista = df_full[df_full['Marca temporal'] >= cutoff].copy()
+    cutoff = pd.Timestamp.now() - pd.Timedelta(hours=24)
+    df_vista = df_full[df_full['Marca temporal'] >= cutoff].copy()
 elif view_option == "Últimos 7 Días":
-    cutoff = pd.Timestamp.now() - pd.Timedelta(days=7)
-    df_vista = df_full[df_full['Marca temporal'] >= cutoff].copy()
+    cutoff = pd.Timestamp.now() - pd.Timedelta(days=7)
+    df_vista = df_full[df_full['Marca temporal'] >= cutoff].copy()
 else:
-    df_vista = df_full.copy()
+    df_vista = df_full.copy()
 
 # --- 6. KPI DASHBOARD (UNIFICADO) ---
 st.title("🛡️ Helium Recovery System")
@@ -447,6 +447,29 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
