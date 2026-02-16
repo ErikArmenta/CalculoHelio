@@ -35,11 +35,8 @@ with st.sidebar:
         ["Últimas 24 Horas", "Últimos 7 Días", "Todo el Historial"]
     )
 
-    if st.button("🔄 Recargar Datos Originales"):
-        st.cache_data.clear()
-        if 'master_data' in st.session_state:
-            del st.session_state['master_data']
-        st.rerun()
+    st.button("🔄 Recargar Datos Originales", on_click=refresh_data_callback)
+
 
     st.markdown("---")
     st.write("**Engineer in Charge:**")
@@ -50,7 +47,7 @@ with st.sidebar:
 sheet_id = "11LjeT8pJLituxpCxYKxWAC8ZMFkgtts6sJn3X-F35A4"
 csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=430617011"
 
-# @st.cache_data()
+@st.cache_data(ttl=60)
 def fetch_raw_data():
     df = pd.read_csv(csv_url)
     df['Marca temporal'] = pd.to_datetime(df['Marca temporal'])
@@ -125,6 +122,44 @@ def enviar_alerta_whatsapp(mensaje: str):
     except Exception as e:
         return f"⚠️ Falla: {str(e)}"
 
+# --- 3.7: LOGICA DE CALLBACKS Y NOTIFICACIONES ---
+def check_and_notify(last_record):
+    """Verifica si es un registro nuevo y envía alerta si supera el umbral."""
+    consumo_actual = last_record['Consumo Absoluto M3']
+    if consumo_actual > 5:
+        # Solo dispara si es un registro nuevo (Marca temporal diferente)
+        if "ultima_alerta_enviada" not in st.session_state or st.session_state.ultima_alerta_enviada != last_record['Marca temporal']:
+            msg_automatico = (
+                f"🚨 *ALERTA AUTOMÁTICA EA*\n"
+                f"Consumo Detectado: {consumo_actual:.2f} M3\n"
+                f"Presión: {last_record['Vessel Pressure']:.1f} PSIA\n"
+                f"Factor Z: {last_record['Compressibility Factor (Z)']:.6f}\n"
+                f"Hora: {last_record['Marca temporal'].strftime('%H:%M:%S')}"
+            )
+            resultado = enviar_alerta_whatsapp(msg_automatico)
+            st.toast(resultado)
+            st.session_state.ultima_alerta_enviada = last_record['Marca temporal']
+
+def refresh_data_callback():
+    """Callback para el botón de recarga."""
+    st.cache_data.clear()
+    if 'master_data' in st.session_state:
+        del st.session_state['master_data']
+
+def update_data_callback():
+    """Callback para el data_editor."""
+    # Al usar on_change, la data editada ya está en st.session_state.data_editor
+    if 'data_editor' in st.session_state:
+        # data_editor devuelve el dataframe completo modificado
+        new_df = st.session_state.data_editor
+        # Actualizamos master_data conservando índices si fuera necesario, 
+        # pero aquí data_editor maneja el df_vista (subset). 
+        # IMPORTANTE: update funciona si índices coinciden.
+        # Simplificación: Actualizamos los valores en master_data correspondientes.
+        st.session_state.master_data.update(new_df)
+        st.session_state.master_data = calculate_thermodynamics(st.session_state.master_data)
+
+
 # --- 4. GESTIÓN DE ESTADO (SESSION STATE) ---
 if 'master_data' not in st.session_state:
     try:
@@ -166,21 +201,8 @@ if not df_vista.empty:
     alert_val = consumo_actual > 5
 
     if alert_val:
-        # Solo dispara si es un registro nuevo (Marca temporal diferente)
-        if "ultima_alerta_enviada" not in st.session_state or st.session_state.ultima_alerta_enviada != last['Marca temporal']:
+        check_and_notify(last)
 
-            msg_automatico = (
-                f"🚨 *ALERTA AUTOMÁTICA EA*\n"
-                f"Consumo Detectado: {consumo_actual:.2f} M3\n"
-                f"Presión: {last['Vessel Pressure']:.1f} PSIA\n"
-                f"Factor Z: {last['Compressibility Factor (Z)']:.6f}\n"
-                f"Hora: {last['Marca temporal'].strftime('%H:%M:%S')}"
-            )
-
-            # Ejecución del servicio de WhatsApp
-            resultado_envio = enviar_alerta_whatsapp(msg_automatico)
-            st.toast(resultado_envio)
-            st.session_state.ultima_alerta_enviada = last['Marca temporal']
 
     # 3. Dibujamos la métrica final en c4 una sola vez
     c4.metric(
@@ -209,13 +231,10 @@ with col_table:
         column_config=column_cfg,
         use_container_width=True,
         key="data_editor",
-        num_rows="fixed"
+        num_rows="fixed",
+        on_change=update_data_callback
     )
 
-    if not edited_df.equals(df_vista):
-        st.session_state.master_data.update(edited_df)
-        st.session_state.master_data = calculate_thermodynamics(st.session_state.master_data)
-        st.rerun()
 
 with col_btn:
     st.write("")
@@ -561,6 +580,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
