@@ -19,30 +19,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. SIDEBAR ---
-with st.sidebar:
-    logo_path = "EA_2.png"
-    if os.path.exists(logo_path):
-        st.image(logo_path, use_container_width=True)
-    else:
-        st.warning("Coloca 'EA_2.png' en la raíz")
-
-    st.title("Control Panel")
-    st.markdown("---")
-
-    view_option = st.selectbox(
-        "Mostrar datos de:",
-        ["Últimas 24 Horas", "Últimos 7 Días", "Todo el Historial"]
-    )
-
-    st.button("🔄 Recargar Datos Originales", on_click=refresh_data_callback)
-
-
-    st.markdown("---")
-    st.write("**Engineer in Charge:**")
-    st.info("Erik Armenta")
-    st.caption("_Accuracy is our signature, and innovation is our nature._")
-
 # --- 3. LÓGICA TERMODINÁMICA (Mantenida intacta) ---
 sheet_id = "11LjeT8pJLituxpCxYKxWAC8ZMFkgtts6sJn3X-F35A4"
 csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=430617011"
@@ -158,6 +134,30 @@ def update_data_callback():
         # Simplificación: Actualizamos los valores en master_data correspondientes.
         st.session_state.master_data.update(new_df)
         st.session_state.master_data = calculate_thermodynamics(st.session_state.master_data)
+
+# --- 2. SIDEBAR ---
+with st.sidebar:
+    logo_path = "EA_2.png"
+    if os.path.exists(logo_path):
+        st.image(logo_path, use_container_width=True)
+    else:
+        st.warning("Coloca 'EA_2.png' en la raíz")
+
+    st.title("Control Panel")
+    st.markdown("---")
+
+    view_option = st.selectbox(
+        "Mostrar datos de:",
+        ["Últimas 24 Horas", "Últimos 7 Días", "Todo el Historial"]
+    )
+
+    st.button("🔄 Recargar Datos Originales", on_click=refresh_data_callback)
+
+
+    st.markdown("---")
+    st.write("**Engineer in Charge:**")
+    st.info("Erik Armenta")
+    st.caption("_Accuracy is our signature, and innovation is our nature._")
 
 
 # --- 4. GESTIÓN DE ESTADO (SESSION STATE) ---
@@ -412,45 +412,17 @@ import altair as alt
 import ssl
 import requests
 
-def enviar_alerta_whatsapp(mensaje: str):
-    """
-    Versión Industrial EA Innovation - Corrección de Endpoint 404
-    """
-    try:
-        # 1. Limpieza absoluta de credenciales
-        instance = str(st.secrets["WHA_INSTANCE"]).strip()
-        token = str(st.secrets["WHA_TOKEN"]).strip()
-        phone = str(st.secrets["WHA_PHONE"]).replace("+", "").strip()
-
-        # 2. Construcción de URL (Formato exacto UltraMsg)
-        # Verificamos que no falte ni sobre la palabra 'instance'
-        if not instance.startswith("instance"):
-            instance = f"instance{instance}"
-
-        url = f"https://api.ultramsg.com/{instance}/messages/chat"
-
-        # 3. Datos del envío
-        payload = {
-            "token": token,
-            "to": phone,
-            "body": mensaje
-        }
-
-        headers = {'content-type': 'application/x-www-form-urlencoded'}
-
-        # 4. Petición con Timeout para evitar bloqueos
-        response = requests.post(url, data=payload, headers=headers, timeout=10)
-
-        if response.status_code == 200:
-            return "✅ Alerta enviada con éxito al Ingeniero Armenta."
-        else:
-            # Si da 404 aquí, es que el ID de la instancia es incorrecto en UltraMsg
-            return f"❌ Error {response.status_code}: La instancia {instance} no fue encontrada."
-
-    except Exception as e:
-        return f"⚠️ Falla de sistema: {str(e)}"
-
-
+# (enviar_alerta_whatsapp is now at the top, redundant import/def removed from here if strictly following plan, but let's check if there is a second definition)
+# Original code had enviar_alerta_whatsapp at line 396 as well?
+# Line 396: def enviar_alerta_whatsapp(mensaje: str):
+# "Versión Industrial EA Innovation - Corrección de Endpoint 404"
+# It seems there were DUPLICATE definitions?
+# Line 110: def enviar_alerta_whatsapp
+# Line 396: def enviar_alerta_whatsapp
+# I should remove the second one to avoid conflicts or just let it override (Python allows override).
+# But better to clean it up.
+# I will keep the one I moved to the top.
+# I will NOT include the one at the bottom in the written file.
 
 def calculadora_expert_ea(temp_c: float, presion_psi: float):
     """Calcula Z, Fv y M3 usando las fórmulas propietarias de Erik Armenta."""
@@ -580,6 +552,7 @@ if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e: st.error(f"Obstáculo técnico: {e}")
+
 
 
 
