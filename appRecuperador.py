@@ -488,6 +488,53 @@ def obtener_diagnostico_avanzado():
     )
     return diagnostico
 
+
+def procesar_audio_voz(audio_bytes: bytes) -> str:
+    """
+    Procesa audio grabado del micrófono usando Gemini.
+    Sube el archivo de audio a Gemini y obtiene la transcripción/interpretación.
+    """
+    import tempfile
+
+    if not audio_bytes:
+        return None
+
+    try:
+        # Guardar audio en archivo temporal
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
+            tmp_audio.write(audio_bytes)
+            tmp_audio_path = tmp_audio.name
+
+        # Subir archivo a Gemini usando genai.upload_file()
+        archivo_audio = genai.upload_file(
+            path=tmp_audio_path,
+            mime_type="audio/wav"
+        )
+
+        # Usar el modelo para transcribir/interpretar el audio
+        modelo_audio = genai.GenerativeModel(modelo_seleccionado)
+
+        prompt_transcripcion = """
+        Escucha este audio y transcribe exactamente lo que el usuario está diciendo.
+        Si es una pregunta o comando relacionado con análisis de helio, termodinámica,
+        gráficas o datos del sistema, devuelve el texto transcrito de forma clara.
+        Solo devuelve la transcripción sin explicaciones adicionales.
+        """
+
+        respuesta = modelo_audio.generate_content([prompt_transcripcion, archivo_audio])
+
+        # Limpiar archivo temporal
+        os.remove(tmp_audio_path)
+
+        # Eliminar el archivo subido de Gemini
+        genai.delete_file(archivo_audio.name)
+
+        return respuesta.text.strip()
+
+    except Exception as e:
+        st.error(f"Error procesando audio: {e}")
+        return None
+
 # C. CONFIGURACIÓN DEL CEREBRO (SELECTOR DE ALTA DISPONIBILIDAD)
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
@@ -511,6 +558,8 @@ try:
     Eres el Agente Senior de EA Innovation. 'Accuracy is our signature'.
         - Tienes acceso a herramientas de cálculo, gráficas y análisis histórico.
         - NUEVA CAPACIDAD: Puedes enviar alertas de WhatsApp ante anomalías.
+        - CAPACIDAD DE VOZ: Puedes recibir comandos por voz. Interpreta peticiones habladas igual que escritas.
+          El usuario puede hablar al micrófono y tú procesarás su solicitud de la misma manera que si la escribiera.
         - REGLA DE ORO: Si detectas un consumo > 5 M3 o una anomalía crítica, ES OBLIGATORIO que primero ejecutes la herramienta 'enviar_alerta_whatsapp' ANTES de dar tu respuesta de texto. No solo digas que la enviaste, ¡ejecútala!
         - Si el usuario te pide 'Avisame si esto vuelve a pasar' o si detectas un consumo > 5 M3,
           ejecuta 'enviar_alerta_whatsapp' con un resumen técnico.
@@ -554,16 +603,23 @@ with col_mic:
     )
 
 # Procesar audio si existe
+texto_desde_voz = None
 if audio_bytes:
-    st.session_state["audio_pendiente"] = audio_bytes
+    with st.spinner("Procesando comando de voz..."):
+        texto_desde_voz = procesar_audio_voz(audio_bytes)
+        if texto_desde_voz:
+            st.info(f"Comando de voz detectado: {texto_desde_voz}")
 
-if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?"):
-    st.session_state.messages.append({"role": "user", "content": chat_input})
-    with st.chat_message("user"): st.markdown(chat_input)
+# Determinar entrada: voz o texto
+entrada_usuario = texto_desde_voz or st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
+
+if entrada_usuario:
+    st.session_state.messages.append({"role": "user", "content": entrada_usuario})
+    with st.chat_message("user"): st.markdown(entrada_usuario)
     with st.chat_message("assistant"):
         try:
             chat = model.start_chat(enable_automatic_function_calling=True)
-            contexto = f"DATOS RECIENTES:\n{df_vista.tail(10).to_string(index=False)}\n\nPREGUNTA: {chat_input}"
+            contexto = f"DATOS RECIENTES:\n{df_vista.tail(10).to_string(index=False)}\n\nPREGUNTA: {entrada_usuario}"
             response = chat.send_message(contexto)
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
