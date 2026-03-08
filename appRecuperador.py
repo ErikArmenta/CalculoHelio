@@ -542,6 +542,21 @@ if "messages" not in st.session_state: st.session_state.messages = []
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
+# Entrada de voz con micrófono
+col_mic, col_chat = st.columns([1, 11])
+with col_mic:
+    audio_bytes = audio_recorder(
+        text="",
+        recording_color="#e74c3c",
+        neutral_color="#3498db",
+        icon_size="2x",
+        pause_threshold=2.0
+    )
+
+# Procesar audio si existe
+if audio_bytes:
+    st.session_state["audio_pendiente"] = audio_bytes
+
 if chat_input := st.chat_input("¿Qué análisis técnico requiere, Ingeniero?"):
     st.session_state.messages.append({"role": "user", "content": chat_input})
     with st.chat_message("user"): st.markdown(chat_input)
