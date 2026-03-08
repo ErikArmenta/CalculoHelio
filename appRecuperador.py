@@ -452,6 +452,32 @@ def crear_grafica_agente(variable_y: str, variable_x: str = 'Marca temporal'):
         return f"Gráfica de {variable_y} generada."
     return f"Error: Variables no encontradas."
 
+def agrupar_datos_agente(columna_agrupar: str, columna_valor: str, operacion: str = 'sum'):
+    """Agrupa datos por una columna y aplica operaciones matemáticas (sum, mean, count, max, min)."""
+    if columna_agrupar not in df_vista.columns:
+        return f"Error: La columna '{columna_agrupar}' no existe en el dataset."
+    if columna_valor not in df_vista.columns:
+        return f"Error: La columna '{columna_valor}' no existe en el dataset."
+
+    operaciones_validas = {'sum': 'sum', 'mean': 'mean', 'count': 'count', 'max': 'max', 'min': 'min',
+                           'promedio': 'mean', 'suma': 'sum', 'total': 'sum', 'contar': 'count',
+                           'maximo': 'max', 'minimo': 'min'}
+
+    op = operaciones_validas.get(operacion.lower(), 'sum')
+
+    try:
+        grupo = df_vista.groupby(columna_agrupar)[columna_valor].agg(op)
+        resultado = {
+            "columna_agrupada": columna_agrupar,
+            "columna_valor": columna_valor,
+            "operacion": op,
+            "total_grupos": len(grupo),
+            "datos": {str(k): round(v, 4) if isinstance(v, float) else v for k, v in grupo.items()}
+        }
+        return resultado
+    except Exception as e:
+        return f"Error al agrupar: {str(e)}"
+
 def analizar_tendencias_historicas(metrica: str):
     """Consulta estadísticas de TODO el historial registrado (df_full)."""
     if metrica in df_full.columns:
