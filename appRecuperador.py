@@ -602,24 +602,41 @@ with col_mic:
         pause_threshold=2.0
     )
 
-# Procesar audio si existe
-texto_desde_voz = None
-if audio_bytes:
-    with st.spinner("Procesando comando de voz..."):
-        texto_desde_voz = procesar_audio_voz(audio_bytes)
-        if texto_desde_voz:
-            st.info(f"Comando de voz detectado: {texto_desde_voz}")
+# Inicializar estado para audio transcrito
+if "audio_transcrito" not in st.session_state:
+    st.session_state.audio_transcrito = None
 
-# Determinar entrada: voz o texto
-entrada_usuario = texto_desde_voz or st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
+# Procesar audio si existe (nueva grabación)
+if audio_bytes and st.session_state.get("ultimo_audio") != hash(audio_bytes):
+    st.session_state.ultimo_audio = hash(audio_bytes)
+    with st.spinner("🎤 Procesando comando de voz..."):
+        texto_transcrito = procesar_audio_voz(audio_bytes)
+        if texto_transcrito:
+            st.session_state.audio_transcrito = texto_transcrito
+            st.rerun()  # Refrescar para mostrar el texto transcrito
+
+# Mostrar texto transcrito si existe
+if st.session_state.audio_transcrito:
+    st.info(f"🎙️ Comando de voz: {st.session_state.audio_transcrito}")
+
+# Entrada de texto normal (chat_input se posiciona automáticamente abajo)
+texto_input = st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
+
+# Determinar entrada: prioridad a voz transcrita, luego texto escrito
+entrada_usuario = st.session_state.audio_transcrito or texto_input
 
 if entrada_usuario:
+    # Limpiar el audio transcrito después de usarlo
+    st.session_state.audio_transcrito = None
+
     st.session_state.messages.append({"role": "user", "content": entrada_usuario})
     with st.chat_message("user"): st.markdown(entrada_usuario)
     with st.chat_message("assistant"):
         try:
             chat = model.start_chat(enable_automatic_function_calling=True)
-            contexto = f"DATOS RECIENTES:\n{df_vista.tail(10).to_string(index=False)}\n\nPREGUNTA: {entrada_usuario}"
+            # Indicar si el mensaje vino por voz
+            prefijo_voz = "[ENTRADA POR VOZ] " if texto_input is None else ""
+            contexto = f"DATOS RECIENTES:\n{df_vista.tail(10).to_string(index=False)}\n\n{prefijo_voz}PREGUNTA: {entrada_usuario}"
             response = chat.send_message(contexto)
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
