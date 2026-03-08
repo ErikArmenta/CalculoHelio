@@ -478,6 +478,33 @@ def agrupar_datos_agente(columna_agrupar: str, columna_valor: str, operacion: st
     except Exception as e:
         return f"Error al agrupar: {str(e)}"
 
+def crear_grafica_barras_agente(variable_x: str, variable_y: str, titulo: str = 'Gráfica de Barras'):
+    """Genera gráficas de barras interactivas para variables categóricas y numéricas."""
+    if variable_x not in df_vista.columns:
+        return f"Error: La columna '{variable_x}' no existe en el dataset."
+    if variable_y not in df_vista.columns:
+        return f"Error: La columna '{variable_y}' no existe en el dataset."
+
+    try:
+        # Determinar si X es temporal, categórica o numérica
+        if 'temporal' in variable_x.lower() or pd.api.types.is_datetime64_any_dtype(df_vista[variable_x]):
+            x_encoding = alt.X(f'{variable_x}:T', title=variable_x)
+        elif pd.api.types.is_numeric_dtype(df_vista[variable_x]):
+            x_encoding = alt.X(f'{variable_x}:Q', title=variable_x)
+        else:
+            x_encoding = alt.X(f'{variable_x}:N', title=variable_x, sort='-y')
+
+        chart = alt.Chart(df_vista).mark_bar(color='#5271ff').encode(
+            x=x_encoding,
+            y=alt.Y(f'{variable_y}:Q', title=variable_y),
+            tooltip=[variable_x, variable_y]
+        ).interactive().properties(height=350, title=titulo)
+
+        st.altair_chart(chart, use_container_width=True)
+        return f"Gráfica de barras '{titulo}' generada: {variable_x} vs {variable_y}."
+    except Exception as e:
+        return f"Error al crear gráfica de barras: {str(e)}"
+
 def analizar_tendencias_historicas(metrica: str):
     """Consulta estadísticas de TODO el historial registrado (df_full)."""
     if metrica in df_full.columns:
@@ -595,11 +622,23 @@ try:
         - "Haz un cálculo a 50 PSI y temperatura ambiente" → usa calculadora_expert_ea con presion=50
         - "Dame el volumen corregido para presión de 150" → usa calculadora_expert_ea con presion=150
 
-        ### crear_grafica_agente (Gráficas y visualizaciones):
+        ### crear_grafica_agente (Gráficas de línea y visualizaciones):
         - "Muéstrame gráfica de presión" → usa crear_grafica_agente tipo="presion"
         - "Hazme una gráfica de consumo" → usa crear_grafica_agente tipo="consumo"
         - "Quiero ver la tendencia de temperatura" → usa crear_grafica_agente tipo="temperatura"
         - "Gráfica de los últimos datos" → usa crear_grafica_agente con datos recientes
+
+        ### crear_grafica_barras_agente (Gráficas de barras):
+        - "Hazme una gráfica de barras de consumo" → usa crear_grafica_barras_agente
+        - "Muestra barras de presión por fecha" → usa crear_grafica_barras_agente
+        - "Quiero ver barras del volumen" → usa crear_grafica_barras_agente
+        - "Gráfica de barras comparando temperatura" → usa crear_grafica_barras_agente
+
+        ### agrupar_datos_agente (Agrupación y agregación de datos):
+        - "Agrupa el consumo por día" → usa agrupar_datos_agente
+        - "Dame el total de presión agrupado por hora" → usa agrupar_datos_agente con operacion='sum'
+        - "Cuál es el promedio de volumen por fecha" → usa agrupar_datos_agente con operacion='mean'
+        - "Cuenta cuántas lecturas hay por día" → usa agrupar_datos_agente con operacion='count'
 
         ### analizar_tendencias_historicas (Estadísticas y análisis):
         - "Analiza las tendencias del mes" → usa analizar_tendencias_historicas
@@ -632,6 +671,8 @@ try:
         tools=[
             calculadora_expert_ea,
             crear_grafica_agente,
+            crear_grafica_barras_agente,
+            agrupar_datos_agente,
             analizar_tendencias_historicas,
             enviar_alerta_whatsapp,
             obtener_diagnostico_avanzado # <-- PODER AÑADIDO
