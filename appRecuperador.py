@@ -10,6 +10,7 @@ import pandas as pd
 import altair as alt
 import os
 import time
+from audio_recorder_streamlit import audio_recorder
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
