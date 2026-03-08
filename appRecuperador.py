@@ -649,9 +649,10 @@ if audio_bytes and st.session_state.get("ultimo_audio") != hash(audio_bytes):
             st.session_state.audio_transcrito = texto_transcrito
             st.rerun()  # Refrescar para mostrar el texto transcrito
 
-# Mostrar texto transcrito si existe
+# Mostrar texto transcrito si existe con feedback visual mejorado
 if st.session_state.audio_transcrito:
-    st.info(f"🎙️ Comando de voz: {st.session_state.audio_transcrito}")
+    st.info(f"🎙️ **Modo Voz Activo** - Procesando: *\"{st.session_state.audio_transcrito}\"*")
+    st.caption("💡 El asistente interpretará tu solicitud y usará las herramientas apropiadas automáticamente.")
 
 # Entrada de texto normal (chat_input se posiciona automáticamente abajo)
 texto_input = st.chat_input("¿Qué análisis técnico requiere, Ingeniero?")
@@ -668,9 +669,20 @@ if entrada_usuario:
     with st.chat_message("assistant"):
         try:
             chat = model.start_chat(enable_automatic_function_calling=True)
-            # Indicar si el mensaje vino por voz
-            prefijo_voz = "[ENTRADA POR VOZ] " if texto_input is None else ""
-            contexto = f"DATOS RECIENTES:\n{df_vista.tail(10).to_string(index=False)}\n\n{prefijo_voz}PREGUNTA: {entrada_usuario}"
+            # Indicar si el mensaje vino por voz con instrucciones claras para el modelo
+            if texto_input is None:
+                prefijo_voz = """[🎤 ENTRADA POR VOZ]
+El usuario está usando ENTRADA POR VOZ. Interpreta su solicitud hablada y usa las herramientas apropiadas según lo que pida:
+- Cálculos de helio/volumen/presión → usa calculadora_expert_ea
+- Gráficas o visualizaciones → usa crear_grafica_agente
+- Análisis o tendencias → usa analizar_tendencias_historicas
+- Alertas o notificaciones → usa enviar_alerta_whatsapp
+- Diagnóstico del sistema → usa obtener_diagnostico_avanzado
+
+SOLICITUD DE VOZ: """
+            else:
+                prefijo_voz = "PREGUNTA: "
+            contexto = f"DATOS RECIENTES:\n{df_vista.tail(10).to_string(index=False)}\n\n{prefijo_voz}{entrada_usuario}"
             response = chat.send_message(contexto)
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
